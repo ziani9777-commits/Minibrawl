@@ -17,7 +17,13 @@ jobs:
       with:
         distribution: 'temurin'
         java-version: '17'
+    - name: Accept Android SDK licenses
+      run: |
+        yes | sdkmanager --licenses || true
 
+    - name: Install Android SDK Build Tools
+      run: |
+        sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
     - name: 🐍 Install Python
       uses: actions/setup-python@v4
       with:
