@@ -1,0 +1,36 @@
+name: Build APK
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y python3-pip build-essential git zip unzip openjdk-17-jdk
+        pip install buildozer cython
+
+    - name: Init buildozer
+      run: |
+        buildozer init
+
+    - name: Modify spec
+      run: |
+        sed -i 's/title = My Application/title = Mini Brawl Stars/' buildozer.spec
+        sed -i 's/package.name = myapp/package.name = minibrawl/' buildozer.spec
+        sed -i 's/source.include_exts = py,png,jpg,kv,atlas/source.include_exts = py,png,jpg,wav,mp3,json/' buildozer.spec
+
+    - name: Build APK
+      run: |
+        buildozer -v android debug
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: apk
+        path: bin/*.apk
