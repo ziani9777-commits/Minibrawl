@@ -25,15 +25,29 @@ jobs:
         python3-pip \
         autoconf libtool pkg-config \
         zlib1g-dev libncurses5-dev \
-        - name: Install system dependencies
+        cmake libffi-dev libssl-dev
+
+    - name: Install Buildozer
       run: |
-        sudo apt update
-        sudo apt install -y \
-        build-essential \
-        git zip unzip \
-        openjdk-17-jdk \
-        python3-pip \
-        autoconf libtool pkg-config \
-        zlib1g-dev libncurses5-dev \
-        cmake libffi-dev libssl-dev
-        cmake libffi-dev libssl-dev
+        pip install --upgrade pip
+        pip install cython buildozer
+
+    - name: Init buildozer
+      run: buildozer init
+
+    - name: Configure buildozer.spec
+      run: |
+        sed -i 's/title = My Application/title = Mini Brawl Stars/' buildozer.spec
+        sed -i 's/package.name = myapp/package.name = minibrawl/' buildozer.spec
+        sed -i 's/package.domain = org.test/package.domain = org.anass/' buildozer.spec
+        sed -i 's/source.include_exts = py,png,jpg,kv,atlas/source.include_exts = py,png,jpg,wav,mp3,json/' buildozer.spec
+        sed -i 's/orientation = landscape/orientation = portrait/' buildozer.spec
+
+    - name: Build APK
+      run: buildozer -v android debug
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: apk
+        path: bin/*.apk
