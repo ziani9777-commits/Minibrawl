@@ -2,46 +2,43 @@ name: Build APK
 
 on:
   push:
-  workflow_dispatch:
-
-permissions:
-  contents: read
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
+    - name: ⬇️ Checkout repository
       uses: actions/checkout@v3
 
-    - name: Install system dependencies
+    - name: ☕ Install Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: 🐍 Install Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: 📦 Install Buildozer + deps
       run: |
         sudo apt update
-        sudo apt install -y \
-        build-essential \
-        git zip unzip \
-        openjdk-17-jdk \
-        python3-pip \
-        autoconf libtool pkg-config \
-        zlib1g-dev libncurses5-dev \
-        cmake libffi-dev libssl-dev
-
-    - name: Install Buildozer
-      run: |
+        sudo apt install -y python3-pip build-essential git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
         pip install --upgrade pip
         pip install buildozer cython
-        
-    - name: Accept Android licenses
+
+    - name: 📱 Accept Android licenses
       run: |
-        mkdir -p $HOME/.android
-        touch $HOME/.android/repositories.cfg
         yes | sdkmanager --licenses || true
 
-    - name: Build APK
-      run: buildozer -v android debug
+    - name: 🔨 Build APK
+      run: |
+        buildozer android debug
 
-    - name: Upload APK
+    - name: 📤 Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: apk
