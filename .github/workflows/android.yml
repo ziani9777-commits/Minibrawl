@@ -9,45 +9,59 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
+    # Java obligatoire
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip build-essential git zip unzip
-          pip install --upgrade pip
-          pip install buildozer cython
+    # Installer dépendances Linux
+    - name: Install system packages
+      run: |
+        sudo apt update
+        sudo apt install -y zip unzip build-essential autoconf \
+        libtool pkg-config zlib1g-dev python3-pip cmake git
 
-      # ⚠️ 1er run : force téléchargement SDK/NDK par buildozer
-      - name: First build (download SDK)
-        run: |
-          buildozer android debug || true
+    # Installer Buildozer
+    - name: Install Buildozer
+      run: |
+        pip install --user buildozer cython
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      # ⚠️ accepter licences DANS le SDK de buildozer
-      - name: Accept SDK licenses (buildozer)
-        run: |
-          yes | ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --licenses || true
+    # 🔥 INSTALL ANDROID SDK MODERNE
+    - name: Install Android SDK cmdline-tools
+      run: |
+        mkdir -p $HOME/android-sdk/cmdline-tools
+        cd $HOME/android-sdk/cmdline-tools
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+        unzip commandlinetools-linux-11076708_latest.zip
+        mv cmdline-tools latest
 
-      # ⚠️ installer build-tools nécessaires (AIDL)
-      - name: Install missing Android tools
-        run: |
-          ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager "platform-tools"
-          ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager "platforms;android-33"
-          ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager "build-tools;33.0.2"
+        echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+        echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
 
-      # ✅ VRAI BUILD
-      - name: Final APK build
-        run: |
-          buildozer -v android debug
+    # Accepter licences Android
+    - name: Accept licenses
+      run: yes | sdkmanager --licenses
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Minibrawl-APK
-          path: bin/*.apk
+    # Installer packages Android nécessaires
+    - name: Install Android packages
+      run: |
+        sdkmanager "platform-tools" \
+                   "platforms;android-33" \
+                   "build-tools;33.0.2"
+
+    # 🚀 Build APK
+    - name: Build with Buildozer
+      run: |
+        buildozer android debug
+
+    # Upload APK (v4 obligatoire)
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: apk
+        path: bin/*.apk
