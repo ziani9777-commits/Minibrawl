@@ -9,12 +9,6 @@ jobs:
   build:
     runs-on: ubuntu-24.04
 
-    env:
-      ANDROID_HOME: ""
-      ANDROID_SDK_ROOT: ""
-      ANDROID_NDK_HOME: ""
-      ANDROID_NDK_ROOT: ""
-
     steps:
     - uses: actions/checkout@v4
 
@@ -24,14 +18,14 @@ jobs:
         distribution: temurin
         java-version: 17
 
-    - name: Install deps
+    - name: Install Linux deps
       run: |
         sudo apt-get update
         sudo apt-get install -y \
           git zip unzip python3-pip autoconf libtool \
           pkg-config zlib1g-dev libncurses-dev \
           libncurses6 libtinfo6 cmake libffi-dev \
-          libssl-dev build-essential
+          libssl-dev build-essential wget
 
         sudo ln -s /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
 
@@ -40,19 +34,23 @@ jobs:
         pip install --upgrade pip
         pip install buildozer cython
 
-    - name: Cache buildozer
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.buildozer
-          .buildozer
-        key: buildozer-${{ runner.os }}
-
-    - name: Accept Android licenses
+    # ⭐ NOUVELLE ÉTAPE IMPORTANTE
+    - name: Install Android cmdline-tools
       run: |
-        mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
-        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+        mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools
+        cd ~/.buildozer/android/platform/android-sdk/cmdline-tools
+
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
+        unzip tools.zip
+        mv cmdline-tools latest
+
+        echo "ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk" >> $GITHUB_ENV
+        echo "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+
+    - name: Accept licenses & install SDK
+      run: |
+        yes | sdkmanager --licenses
+        sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
     - name: Build APK
       run: buildozer -v android debug
