@@ -10,36 +10,24 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    - name: Install system dependencies
+    - name: Install dependencies
       run: |
         sudo apt update
         sudo apt install -y \
-        python3-pip \
-        build-essential \
-        git \
-        zip unzip \
-        openjdk-17-jdk \
-        autoconf libtool pkg-config \
-        zlib1g-dev \
-        libncurses5-dev libncursesw5-dev \
+        python3-pip build-essential git zip unzip \
+        openjdk-17-jdk autoconf libtool pkg-config \
+        zlib1g-dev libncurses5-dev libncursesw5-dev \
         libtinfo5 cmake libffi-dev libssl-dev
 
-    - name: Install Buildozer & Cython
+    - name: Install Buildozer
       run: |
         python3 -m pip install --upgrade pip
         pip install buildozer cython==0.29.33
 
-    # ⭐️ LA LIGNE QUI MANQUAIT !!!
-    - name: Accept Android licenses
-      run: yes | sdkmanager --licenses || true
-
     - name: Build APK
-      run: |
-        buildozer android clean
-        buildozer -v android debug
+      run: buildozer -v android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
