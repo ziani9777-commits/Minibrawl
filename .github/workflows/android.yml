@@ -13,7 +13,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v4
 
-    # 🧱 Dépendances système complètes (fix Ubuntu 24 + buildozer)
+    # 🧱 Dépendances système
     - name: Install system dependencies
       run: |
         sudo dpkg --add-architecture i386
@@ -40,24 +40,23 @@ jobs:
           zlib1g:i386 \
           libncurses6:i386
 
-    # 🐍 Installer Buildozer + Cython version compatible
-    - name: Install Python tools
+    # 🐍 Python tools
+    - name: Install Buildozer
       run: |
         python3 -m pip install --upgrade pip
         pip install "Cython==0.29.33"
         pip install buildozer
 
-    # ☕ Forcer JAVA 17 (important pour sdkmanager)
+    # ☕ Java 17 obligatoire pour sdkmanager
     - name: Set JAVA_HOME
       run: echo "JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64" >> $GITHUB_ENV
 
-    # 📱 Build APK
+    # 📱 BUILD APK (PAS DE CLEAN ici ❗)
     - name: Build APK
       run: |
-        buildozer android clean
         buildozer -v android debug
 
-    # 📦 Upload APK artifact
+    # 📦 Upload APK
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
