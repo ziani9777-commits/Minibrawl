@@ -30,9 +30,26 @@ jobs:
         mkdir -p ~/.android
         echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.android/repositories.cfg || true
 
-    - name: Build APK
+    - name: Install Android SDK manually
       run: |
-        buildozer android debug
+       mkdir -p $HOME/android-sdk/cmdline-tools
+       cd $HOME/android-sdk/cmdline-tools
+       wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O sdk.zip
+       unzip sdk.zip
+       mv cmdline-tools latest
+
+       yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+
+       $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager \
+      "platform-tools" \
+      "platforms;android-33" \
+      "build-tools;33.0.2"
+
+         - name: Build APK
+  env:
+    ANDROIDSDK: $HOME/android-sdk
+  run: |
+    buildozer android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
