@@ -17,14 +17,14 @@ jobs:
       with:
         python-version: "3.10"
 
-    # Java 17 obligatoire
+    # Java 17
     - name: Setup Java
       uses: actions/setup-java@v3
       with:
         distribution: "temurin"
         java-version: "17"
 
-    # Installer dépendances Linux
+    # Dépendances Linux
     - name: Install dependencies
       run: |
         sudo apt update
@@ -32,7 +32,7 @@ jobs:
         pip install --upgrade pip
         pip install buildozer cython
 
-    # Installer Android SDK (CORRIGÉ 100%)
+    # Installer Android SDK (FIX FINAL)
     - name: Install Android SDK
       run: |
         mkdir -p $HOME/android-sdk
@@ -41,25 +41,21 @@ jobs:
         wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
         unzip commandlinetools-linux-11076708_latest.zip
 
-        mkdir -p cmdline-tools/latest
-        mv cmdline-tools/* cmdline-tools/latest/
-
         export ANDROID_HOME=$HOME/android-sdk
         export ANDROID_SDK_ROOT=$HOME/android-sdk
-        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/bin:$ANDROID_HOME/platform-tools
 
-        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+        yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --licenses
+        $ANDROID_HOME/cmdline-tools/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
         echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
         echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-        echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        echo "$ANDROID_HOME/cmdline-tools/bin" >> $GITHUB_PATH
         echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
-    # 🔥 Build APK
+    # Build APK
     - name: Build APK
-      run: |
-        buildozer android debug
+      run: buildozer android debug
 
     # Upload APK
     - name: Upload APK
