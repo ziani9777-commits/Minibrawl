@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-24.04
 
     env:
-      # Force Buildozer SDK
       ANDROID_HOME: ""
       ANDROID_SDK_ROOT: ""
       ANDROID_NDK_HOME: ""
@@ -49,10 +48,6 @@ jobs:
           .buildozer
         key: buildozer-${{ runner.os }}
 
-    - name: Clean
-      run: buildozer android clean
-
-    # ⭐⭐⭐ LE FIX FINAL ⭐⭐⭐
     - name: Accept Android licenses
       run: |
         mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
