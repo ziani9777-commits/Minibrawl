@@ -2,56 +2,67 @@ name: Build APK
 
 on:
   push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout repo
+      uses: actions/checkout@v4
 
-    - name: Install packages
+    - name: Install system packages
       run: |
         sudo apt update
         sudo apt install -y \
-        build-essential git zip unzip openjdk-17-jdk \
-        python3-pip autoconf libtool pkg-config \
-        zlib1g-dev libncurses-dev \
-        cmake libffi-dev libssl-dev
+          python3-pip \
+          build-essential \
+          git \
+          zip \
+          unzip \
+          openjdk-17-jdk \
+          autoconf \
+          libtool \
+          pkg-config \
+          zlib1g-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libtinfo5 \
+          cmake \
+          libffi-dev \
+          libssl-dev
 
-    - name: Install Python deps
+    - name: Install Buildozer & Cython
       run: |
         pip install --upgrade pip
         pip install buildozer cython
 
+    # 🔑 Accepter licences Android
     - name: Accept licenses
       run: |
         mkdir -p ~/.android
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.android/repositories.cfg || true
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.android/repositories.cfg
 
-     - name: Install Android SDK manually
-  run: |
-    mkdir -p $HOME/android-sdk/cmdline-tools
-    cd $HOME/android-sdk/cmdline-tools
+    # 📦 Installer Android SDK correctement
+    - name: Install Android SDK manually
+      run: |
+        mkdir -p $HOME/android-sdk/cmdline-tools
+        cd $HOME/android-sdk/cmdline-tools
 
-    wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O sdk.zip
-    unzip sdk.zip
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O sdk.zip
+        unzip sdk.zip
 
-    mv cmdline-tools latest
+        mv cmdline-tools latest
 
-    yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/android-sdk \
-      "platform-tools" \
-      "platforms;android-33" \
-      "build-tools;33.0.2"
-          - name: Build APK
-  env:
-    ANDROIDSDK: $HOME/android-sdk
-  run: |
-    buildozer android debug
+        yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/android-sdk \
+          "platform-tools" \
+          "platforms;android-33" \
+          "build-tools;33.0.2"
 
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: APK
-        path: bin/*.apk
+    - name: Build APK
+      env:
+        ANDROIDSDK: $HOME/android-sdk
+      run: |
+        buildozer android debug
