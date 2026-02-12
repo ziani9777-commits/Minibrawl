@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build APK
 
 on:
   push:
@@ -6,45 +6,37 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
+    - name: 📥 Checkout
+      uses: actions/checkout@v3
 
-    - name: Install system dependencies
+    - name: 🐍 Install Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+
+    - name: ☕ Install Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: "temurin"
+        java-version: "17"
+
+    - name: 📦 Install dependencies
       run: |
-        sudo dpkg --add-architecture i386
-        sudo apt update
-        sudo apt install -y \
-          python3-pip \
-          build-essential \
-          git \
-          zip \
-          unzip \
-          openjdk-17-jdk \
-          libffi-dev \
-          libssl-dev \
-          zlib1g-dev \
-          libncurses6:i386 \
-          libstdc++6:i386 \
-          libz1:i386 \
-          libbz2-1.0:i386
+        python -m pip install --upgrade pip
+        pip install buildozer cython
 
-    - name: Set JAVA_HOME
-      run: echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
+    # ⭐⭐⭐ LA LIGNE MAGIQUE ⭐⭐⭐
+    - name: 🤖 Accept Android licenses
+      run: yes | sdkmanager --licenses || true
 
-    - name: Install Python dependencies
-      run: |
-        python3 -m pip install --upgrade pip
-        pip install -r requirements.txt
+    - name: 🔨 Build APK
+      run: buildozer android debug
 
-    - name: Build APK with Buildozer
-      run: |
-        buildozer android debug
-          
-    - name: Upload APK
+    - name: 📤 Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: MiniBrawl-APK
+        name: app-debug
         path: bin/*.apk
