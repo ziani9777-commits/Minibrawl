@@ -3,23 +3,17 @@ name: Build APK
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-24.04
 
     steps:
-    - name: Checkout repository
+    - name: Checkout repo
       uses: actions/checkout@v4
 
-    # 🟢 Java 17 obligatoire pour buildozer
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: 17
-
-    # 🟢 Installer dépendances Linux pour Kivy / Buildozer
+    # 🧱 Dépendances système complètes (fix Ubuntu 24 + buildozer)
     - name: Install system dependencies
       run: |
         sudo dpkg --add-architecture i386
@@ -40,50 +34,30 @@ jobs:
           libtinfo-dev \
           cmake \
           libffi-dev \
-          libssl-dev
+          libssl-dev \
+          libstdc++6:i386 \
+          libgcc-s1:i386 \
+          zlib1g:i386 \
+          libncurses6:i386
 
-    # 🟢 Installer Buildozer + Cython
-    - name: Install Python dependencies
+    # 🐍 Installer Buildozer + Cython version compatible
+    - name: Install Python tools
       run: |
-        pip install --user buildozer cython
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        python3 -m pip install --upgrade pip
+        pip install "Cython==0.29.33"
+        pip install buildozer
 
-    # 💣 Installer Android SDK + FIX BUILDOZER (le hack magique)
-    - name: Install Android cmdline-tools + Fix sdkmanager
+    # ☕ Forcer JAVA 17 (important pour sdkmanager)
+    - name: Set JAVA_HOME
+      run: echo "JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64" >> $GITHUB_ENV
+
+    # 📱 Build APK
+    - name: Build APK
       run: |
-        ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
-        mkdir -p $ANDROID_HOME/cmdline-tools
-        cd $ANDROID_HOME/cmdline-tools
-
-        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
-        unzip tools.zip
-        mv cmdline-tools latest
-
-        # 🔥 HACK pour Buildozer (très important)
-        mkdir -p $ANDROID_HOME/tools/bin
-        ln -s $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager $ANDROID_HOME/tools/bin/sdkmanager
-        ln -s $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager $ANDROID_HOME/tools/bin/avdmanager
-
-        echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
-        echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
-
-    # 🟢 Accepter licences Android
-    - name: Accept Android licenses
-      run: yes | sdkmanager --licenses
-
-    # 🟢 Installer plateformes Android requises
-    - name: Install Android platforms
-      run: |
-        sdkmanager "platform-tools"
-        sdkmanager "platforms;android-33"
-        sdkmanager "build-tools;33.0.2"
-
-    # 🟢 Build APK avec Buildozer
-    - name: Build with Buildozer
-      run: |
+        buildozer android clean
         buildozer -v android debug
 
-    # 📦 Upload APK en artifact GitHub
+    # 📦 Upload APK artifact
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
