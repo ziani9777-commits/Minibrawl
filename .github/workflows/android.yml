@@ -1,60 +1,59 @@
-name: Build APK
+name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches: [ "main" ]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
-    - name: 📥 Checkout
+    - name: 📥 Checkout repo
       uses: actions/checkout@v3
 
-    - name: 🐍 Setup Python
+    # Installer Python compatible Buildozer
+    - name: 🐍 Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: 3.10
+        python-version: '3.10'
 
-    - name: ☕ Install Java 17
-      uses: actions/setup-java@v3
-      with:
-        distribution: temurin
-        java-version: 17
-
-    - name: 🧰 Install dependencies
+    # Installer dépendances Linux pour Buildozer
+    - name: ⚙️ Install system packages
       run: |
         sudo apt update
-        sudo apt install -y zip unzip openjdk-17-jdk python3-pip \
-        autoconf libtool pkg-config zlib1g-dev libncurses5-dev \
-        libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+        sudo apt install -y \
+          build-essential \
+          git \
+          zip \
+          unzip \
+          openjdk-17-jdk \
+          python3-pip \
+          autoconf \
+          libtool \
+          pkg-config \
+          zlib1g-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libtinfo5 \
+          cmake \
+          libffi-dev \
+          libssl-dev
 
-    - name: 🐍 Install Buildozer + Cython
+    # Installer Buildozer
+    - name: 📦 Install Buildozer
       run: |
         python -m pip install --upgrade pip
-        pip install buildozer cython==0.29.33
+        pip install buildozer cython
 
-    - name: 🤖 Install Android SDK + accept licenses
+    # 🔥 Build APK
+    - name: 📱 Build with Buildozer
       run: |
-        buildozer android update
-        
-        SDK=$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager
-        
-        yes | $SDK --licenses
-        
-        $SDK "platform-tools"
-        $SDK "platforms;android-33"
-        $SDK "build-tools;33.0.2"
-        
-        yes | $SDK --licenses
+        buildozer android debug
 
-    - name: 📦 Build APK
-      run: buildozer android debug
-
+    # 📤 Envoyer APK en téléchargement
     - name: 📤 Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: app-debug
+        name: game-apk
         path: bin/*.apk
