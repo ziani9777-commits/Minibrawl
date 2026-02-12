@@ -58,10 +58,10 @@ jobs:
         sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
     # 🚀 Build APK avec Buildozer
-    - name: Build APK
+    - name: Build APK (FULL LOG)
       run: |
         export PATH=$PATH:/home/runner/.local/bin
-        buildozer android debug
+        buildozer -v android debug
 
     # 📦 Upload APK (version corrigée v4)
     - name: Upload APK
