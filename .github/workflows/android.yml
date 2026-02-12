@@ -1,32 +1,30 @@
-name: Build APK (Kivy Buildozer)
+name: Build APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-    - name: Checkout repo
+    - name: Checkout
       uses: actions/checkout@v4
 
-    # 🟢 Java obligatoire pour Android
-    - name: Setup Java
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Set up Java 17
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
 
-    # 🟢 Python
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    # 🟢 Dépendances Linux pour Buildozer
+    # 🔧 Dépendances Linux nécessaires à Buildozer
     - name: Install system deps
       run: |
         sudo apt update
@@ -35,60 +33,50 @@ jobs:
           git \
           zip \
           unzip \
-          openjdk-17-jdk \
           autoconf \
           libtool \
           pkg-config \
           zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
-          libtinfo5 \
+          libncurses6 \
+          libncursesw6 \
+          libtinfo6 \
           cmake \
           libffi-dev \
           libssl-dev
 
-    # 🟢 Installer Buildozer + Cython
-    - name: Install Buildozer
+    # 🐍 Installer Buildozer + Cython + Kivy
+    - name: Install Python deps
       run: |
         python -m pip install --upgrade pip
-        pip install buildozer cython
+        pip install buildozer cython kivy
 
-    # 🔥 INSTALLATION ANDROID SDK PROPRE (LA PARTIE QUI BLOQUAIT)
+    # 📱 Installer Android SDK (méthode moderne cmdline-tools)
     - name: Install Android SDK
       run: |
         mkdir -p $HOME/android-sdk/cmdline-tools
         cd $HOME/android-sdk/cmdline-tools
-
-        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O sdk.zip
-        unzip sdk.zip
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
+        unzip tools.zip
         mv cmdline-tools latest
 
         echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-        echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
-        echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-        echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
+        echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
 
-    # 🔥 ACCEPTER LES LICENCES (METHODE CI OFFICIELLE)
-    - name: Accept licenses & install SDK packages
+    # 📜 Accepter licences + installer packages Android
+    - name: Accept licenses and install packages
       run: |
-        mkdir -p ~/.android
-        touch ~/.android/repositories.cfg
+        yes | sdkmanager --licenses
+        sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
-        yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses > /dev/null
-
-        sdkmanager --sdk_root=$ANDROID_SDK_ROOT \
-          "platform-tools" \
-          "platforms;android-34" \
-          "build-tools;34.0.0"
-
-    # 🚀 Build APK avec Buildozer
-    - name: Build with Buildozer
+    # 🔨 Build APK avec Buildozer
+    - name: Build APK
       run: |
-        buildozer android debug
+        buildozer init || true
+        buildozer -v android debug
 
-    # 📦 Upload APK (v4 obligatoire)
+    # 📦 Upload APK (version v4 obligatoire)
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: apk
+        name: my-apk
         path: bin/*.apk
