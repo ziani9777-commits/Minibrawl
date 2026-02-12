@@ -5,11 +5,11 @@ package.name = minibrawl
 package.domain = org.minibrawl
 
 source.dir = .
-source.include_exts = py,png,jpg,kv,mp3,wav,json
+source.include_exts = py,png,jpg,kv,atlas,wav,mp3,json
 
 version = 1.0
 
-requirements = python3,kivy==2.2.1,pillow
+requirements = python3,kivy
 
 orientation = portrait
 fullscreen = 0
@@ -17,18 +17,13 @@ fullscreen = 0
 android.api = 33
 android.minapi = 21
 android.ndk = 25b
-android.arch = arm64-v8a
-
-android.permissions = INTERNET
-
 android.accept_sdk_license = True
 
-android.gradle_dependencies =
+android.permissions = INTERNET,VIBRATE
 
-android.enable_androidx = True
+# ⚠️ ON BUILD APK (PAS AAB)
+android.release_artifact = apk
 
-android.logcat_filters = *:S python:D
-
-p4a.branch = stable
-
+[buildozer]
 log_level = 2
+warn_on_root = 1
