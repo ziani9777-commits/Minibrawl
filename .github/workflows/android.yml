@@ -3,67 +3,44 @@ name: Build APK
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-22.04
 
-    env:
-      ANDROIDAPI: 33
-      ANDROIDMINAPI: 21
-      ANDROIDNDK: 25b
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    # Python compatible avec Buildozer
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: "17"
 
-    # Java 11 obligatoire pour Android build
-    - name: Set up Java 11
-      uses: actions/setup-java@v4
-      with:
-        distribution: "temurin"
-        java-version: "11"
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-    # Dépendances système nécessaires à python-for-android
-    - name: Install system dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y \
-          git zip unzip autoconf libtool pkg-config \
-          zlib1g-dev libncurses5-dev libncursesw5-dev \
-          libtinfo5 cmake libffi-dev libssl-dev
+      - name: Install Android packages
+        run: |
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-33"
+          sdkmanager "build-tools;33.0.2"
+          yes | sdkmanager --licenses
 
-    # Installer Buildozer et Cython
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install buildozer cython
+      - name: Install Python & Buildozer
+        run: |
+          sudo apt update
+          sudo apt install -y python3-pip build-essential git zip unzip openjdk-17-jdk
+          pip install --upgrade pip
+          pip install buildozer cython
 
-    # 🔥 ÉTAPE CRITIQUE : accepter licences Android
-    - name: Accept Android SDK licenses
-      run: |
-        mkdir -p ~/.android
-        touch ~/.android/repositories.cfg
-        yes | sdkmanager --licenses || true
+      - name: Build APK with Buildozer
+        run: buildozer android debug
 
-    # Nettoyer (évite les bugs cache)
-    - name: Clean previous builds
-      run: buildozer android clean || true
-
-    # 🚀 Build APK
-    - name: Build APK with Buildozer
-      run: buildozer -v android debug
-
-    # 📦 Upload APK
-    - name: Upload APK artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Minibrawl-APK
-        path: bin/*.apk
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: APK
+          path: bin/*.apk
+```0
