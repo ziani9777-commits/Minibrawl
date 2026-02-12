@@ -6,44 +6,52 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04   # ⚠️ PAS ubuntu-latest !
+    runs-on: ubuntu-22.04
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
 
-    # ✅ JAVA 17 OBLIGATOIRE POUR ANDROID SDK
+    # JAVA 17 obligatoire pour Android SDK
     - name: Set up Java 17
       uses: actions/setup-java@v4
       with:
         distribution: temurin
         java-version: '17'
 
-    # ✅ dépendances Linux compatibles buildozer
-    - name: Install dependencies
+    - name: Install Python + Buildozer
       run: |
-        sudo dpkg --add-architecture i386
+        python3 -m pip install --upgrade pip
+        pip install buildozer cython
+
+    - name: Install system deps
+      run: |
         sudo apt update
         sudo apt install -y \
-          build-essential \
-          git zip unzip \
-          python3-pip \
-          autoconf libtool pkg-config \
-          zlib1g-dev \
-          libncurses5:i386 \
-          libstdc++6:i386 \
-          libffi-dev libssl-dev
+        git zip unzip openjdk-17-jdk \
+        python3-pip autoconf libtool pkg-config \
+        zlib1g-dev libncurses-dev \
+        libffi-dev libssl-dev
 
-    # ✅ installer buildozer
-    - name: Install Buildozer
+    - name: Install Android SDK
       run: |
-        pip install --user --upgrade cython buildozer
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        mkdir -p $HOME/android-sdk/cmdline-tools
+        cd $HOME/android-sdk/cmdline-tools
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
+        unzip tools.zip
+        mv cmdline-tools latest
 
-    # ✅ lancer le build
+        echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+        echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+
+    - name: Accept licenses + install SDK
+      run: |
+        yes | sdkmanager --licenses
+        sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+
     - name: Build APK
       run: buildozer -v android debug
 
-    # ✅ récupérer APK
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
