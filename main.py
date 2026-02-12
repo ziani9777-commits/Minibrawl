@@ -1,221 +1,124 @@
-import kivy
+# ---------- CONFIG MOBILE ----------
+from kivy.config import Config
+Config.set('graphics', 'fullscreen', 'auto')
+Config.set('graphics', 'resizable', False)
+Config.set('kivy', 'keyboard_mode', 'systemanddock')
+
+# ---------- IMPORTS ----------
 from kivy.app import App
 from kivy.uix.widget import Widget
-from kivy.uix.label import Label
-from kivy.properties import NumericProperty, ReferenceListProperty, ObjectProperty, ListProperty, StringProperty
+from kivy.properties import NumericProperty
 from kivy.clock import Clock
 from kivy.vector import Vector
-from kivy.core.audio import SoundLoader
-from random import randint, choice
-import json, os
+from kivy.uix.button import Button
+from kivy.graphics import Color, Rectangle
+from random import randint
 
-kivy.require('2.1.0')
+# ---------- BALLE ----------
+class Bullet(Widget):
+    velocity_y = NumericProperty(10)
 
-SAVE_FILE = 'save.json'
+    def update(self):
+        self.y += self.velocity_y
+        if self.y > self.parent.height:
+            self.parent.remove_widget(self)
 
-# --- Sons ---
-shoot_sound = SoundLoader.load('shoot.wav')
-hit_sound = SoundLoader.load('hit.wav')
-super_sound = SoundLoader.load('super.wav')
-explosion_sound = SoundLoader.load('explosion.wav')
-music = SoundLoader.load('music.mp3')
-if music:
-    music.loop = True
-    music.play()
-
-# --- Joueur ---
+# ---------- JOUEUR ----------
 class Player(Widget):
-    health = NumericProperty(100)
-    super_energy = NumericProperty(0)
-    color = ListProperty([0,1,0,1])
-    score = NumericProperty(0)
-    skin = NumericProperty(0)
+    velocity_x = NumericProperty(0)
 
-    def move(self, dx, dy):
-        self.pos = Vector(dx, dy) + self.pos
+    def update(self):
+        self.x += self.velocity_x
+
+        # limite écran
+        if self.x < 0:
+            self.x = 0
+        if self.right > self.parent.width:
+            self.right = self.parent.width
 
     def shoot(self):
-        bullet = Bullet(owner='player', color=self.color)
-        bullet.center = self.center
-        bullet.velocity = Vector(15, 0)
+        bullet = Bullet(size=(10,20), pos=(self.center_x-5, self.top))
+        with bullet.canvas:
+            Color(1,0,0)
+            Rectangle(pos=bullet.pos, size=bullet.size)
         self.parent.add_widget(bullet)
-        if shoot_sound:
-            shoot_sound.play()
-        self.super_energy = min(100, self.super_energy + 10)
 
-    def super_attack(self):
-        if self.super_energy >= 100:
-            for angle in range(0, 360, 15):
-                bullet = Bullet(owner='player', color=[1,1,0,1])
-                bullet.center = self.center
-                bullet.velocity = Vector(20, 0).rotate(angle)
-                self.parent.add_widget(bullet)
-            self.super_energy = 0
-            if super_sound:
-                super_sound.play()
-
-# --- Ennemi ---
-class Enemy(Widget):
-    health = NumericProperty(50)
-    shoot_cooldown = NumericProperty(0)
-    color = ListProperty([1,0,0,1])
-    type = StringProperty('basic')
-
-    def move_random(self):
-        if self.type == 'fast':
-            dx = randint(-6,6)
-            dy = randint(-6,6)
-        elif self.type == 'tank':
-            dx = randint(-2,2)
-            dy = randint(-2,2)
-        else:
-            dx = randint(-3,3)
-            dy = randint(-3,3)
-        self.pos = Vector(dx, dy) + self.pos
-
-    def shoot(self, player):
-        if self.type == 'shooter' and self.shoot_cooldown <=0:
-            bullet = Bullet(owner='enemy', color=self.color)
-            bullet.center = self.center
-            direction = Vector(player.center_x - self.center_x, player.center_y - self.center_y).normalize() * 12
-            bullet.velocity = direction
-            self.parent.add_widget(bullet)
-            self.shoot_cooldown = randint(40,80)
-        else:
-            self.shoot_cooldown -=1
-
-# --- Bullet ---
-class Bullet(Widget):
-    velocity_x = NumericProperty(0)
-    velocity_y = NumericProperty(0)
-    velocity = ReferenceListProperty(velocity_x, velocity_y)
-    owner = StringProperty('')
-    color = ListProperty([1,1,1,1])
-
-    def move(self):
-        self.pos = Vector(*self.velocity) + self.pos
-
-# --- Health Bar ---
-class HealthBar(Widget):
-    target = ObjectProperty(None)
+# ---------- JEU ----------
+class GameWidget(Widget):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        Clock.schedule_interval(self.update,1/60)
+
+        # fond
+        with self.canvas:
+            Color(0.1,0.1,0.1)
+            self.bg = Rectangle(size=self.size, pos=self.pos)
+        self.bind(size=self.update_bg, pos=self.update_bg)
+
+        # joueur
+        self.player = Player(size=(80,80), pos=(200,50))
+        with self.player.canvas:
+            Color(0,1,0)
+            Rectangle(pos=self.player.pos, size=self.player.size)
+        self.add_widget(self.player)
+
+        Clock.schedule_interval(self.update, 1/60)
+
+    def update_bg(self,*a):
+        self.bg.size = self.size
 
     def update(self, dt):
-        if self.target:
-            self.size = (self.target.width * self.target.health / 100, 5)
-            self.pos = (self.target.x, self.target.top + 2)
+        self.player.update()
 
-# --- Game ---
-class Game(Widget):
-    player = ObjectProperty(None)
+        for child in self.children[:]:
+            if isinstance(child, Bullet):
+                child.update()
 
-    def __init__(self, **kwargs):
+# ---------- CONTROLES TACTILES ----------
+class MobileControls(Widget):
+    def __init__(self, game, **kwargs):
         super().__init__(**kwargs)
-        self.enemies = []
-        self.health_bars = []
-        # Spawn différents types d'ennemis
-        for _ in range(2):
-            self.spawn_enemy('basic')
-            self.spawn_enemy('fast')
-            self.spawn_enemy('tank')
-            self.spawn_enemy('shooter')
-        # Score label
-        self.score_label = Label(text='Score: 0', pos=(10, 760), font_size=20)
-        self.add_widget(self.score_label)
-        # Player health bar
-        self.player_bar = HealthBar()
-        # Charger progression
-        self.load_progression()
-        Clock.schedule_interval(self.update,1/60)
+        self.game = game
 
-    def spawn_enemy(self, type_):
-        enemy = Enemy(type=type_)
-        enemy.pos = (randint(100,500),randint(100,700))
-        if type_=='fast': enemy.color=[1,1,0,1]
-        if type_=='tank': enemy.color=[0.5,0.2,0,1]
-        if type_=='shooter': enemy.color=[1,0,1,1]
-        self.add_widget(enemy)
-        self.enemies.append(enemy)
-        hb = HealthBar(target=enemy)
-        self.add_widget(hb)
-        self.health_bars.append(hb)
+        # gauche
+        btn_left = Button(text="◀", size_hint=(.25,.2), pos_hint={"x":0,"y":0})
+        btn_left.bind(on_press=self.left_down, on_release=self.stop)
 
-    def on_touch_move(self, touch):
-        self.player.center = touch.pos
+        # droite
+        btn_right = Button(text="▶", size_hint=(.25,.2), pos_hint={"x":.26,"y":0})
+        btn_right.bind(on_press=self.right_down, on_release=self.stop)
 
-    def on_touch_down(self, touch):
-        if touch.is_double_tap:
-            self.player.super_attack()
-        else:
-            self.player.shoot()
+        # tir
+        btn_fire = Button(text="🔥", size_hint=(.25,.2), pos_hint={"right":1,"y":0})
+        btn_fire.bind(on_press=self.fire)
 
-    def update(self, dt):
-        # Déplacer bullets
-        for bullet in [b for b in self.children if isinstance(b, Bullet)]:
-            bullet.move()
-            if bullet.owner=='player':
-                for enemy in self.enemies:
-                    if bullet.collide_widget(enemy):
-                        enemy.health -= 10
-                        if hit_sound:
-                            hit_sound.play()
-                        self.remove_widget(bullet)
-                        if enemy.health <=0:
-                            if explosion_sound: explosion_sound.play()
-                            self.remove_widget(enemy)
-                            self.enemies.remove(enemy)
-                            self.player.score += 10
-                            self.score_label.text=f'Score: {self.player.score}'
-                            # Respawn un nouvel ennemi aléatoire
-                            self.spawn_enemy(choice(['basic','fast','tank','shooter']))
-                        break
-            elif bullet.owner=='enemy':
-                if bullet.collide_widget(self.player):
-                    self.player.health -=5
-                    if hit_sound:
-                        hit_sound.play()
-                    self.remove_widget(bullet)
-        # Déplacer ennemis et tirer
-        for enemy in self.enemies:
-            enemy.move_random()
-            enemy.shoot(self.player)
-        # Mettre à jour player health bar
-        self.player_bar.update(dt)
-        # Sauvegarder score
-        self.save_progression()
+        self.add_widget(btn_left)
+        self.add_widget(btn_right)
+        self.add_widget(btn_fire)
 
-    def load_progression(self):
-        if os.path.exists(SAVE_FILE):
-            try:
-                with open(SAVE_FILE,'r') as f:
-                    data=json.load(f)
-                    self.player.score = data.get('score',0)
-                    self.player.skin = data.get('skin',0)
-                    self.player.color = data.get('color',[0,1,0,1])
-            except: pass
+    def left_down(self,*a):
+        self.game.player.velocity_x = -6
 
-    def save_progression(self):
-        try:
-            data = {'score':self.player.score,'skin':self.player.skin,'color':self.player.color}
-            with open(SAVE_FILE,'w') as f:
-                json.dump(data,f)
-        except: pass
+    def right_down(self,*a):
+        self.game.player.velocity_x = 6
 
-# --- App ---
+    def stop(self,*a):
+        self.game.player.velocity_x = 0
+
+    def fire(self,*a):
+        self.game.player.shoot()
+
+# ---------- APP ----------
 class MiniBrawlApp(App):
     def build(self):
-        game = Game()
-        player = Player()
-        player.pos = (300,300)
-        game.player = player
-        game.add_widget(player)
-        # Player health bar
-        game.player_bar.target = player
-        game.add_widget(game.player_bar)
-        return game
+        root = Widget()
 
-if __name__=='__main__':
-    MiniBrawlApp().run()
+        game = GameWidget()
+        controls = MobileControls(game)
+
+        root.add_widget(game)
+        root.add_widget(controls)
+
+        return root
+
+MiniBrawlApp().run()
