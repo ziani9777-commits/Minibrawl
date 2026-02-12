@@ -1,31 +1,30 @@
 [app]
 
-title = Mini Brawl Stars
+title = Minibrawl
 package.name = minibrawl
-package.domain = org.test
+package.domain = org.minibrawl
 
 source.dir = .
-source.include_exts = py,png,jpg,wav,mp3,json,kv
+source.include_exts = py,png,jpg,kv,atlas,json,mp3,wav
 
 version = 1.0
 
-requirements = 
-python3,kivy==2.3.0,pillow,ffpyplayer
+requirements = python3,kivy
 
 orientation = portrait
 fullscreen = 0
 
-# Android config
+android.permissions = INTERNET
+
 android.api = 33
 android.minapi = 21
-android.sdk = 33
 android.ndk = 25b
-android.build_tools = 33.0.2
-android.accept_sdk_license = True
 
-android.permissions = INTERNET,VIBRATE
+android.archs = arm64-v8a, armeabi-v7a
+
+log_level = 2
+warn_on_root = 1
 
 [buildozer]
 
 log_level = 2
-warn_on_root = 1
