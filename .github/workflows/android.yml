@@ -9,11 +9,9 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    # Installer dépendances Linux
-    - name: Install system packages
+    - name: Install packages
       run: |
         sudo apt update
         sudo apt install -y \
@@ -22,43 +20,20 @@ jobs:
         zlib1g-dev libncurses-dev \
         cmake libffi-dev libssl-dev
 
-    # Installer Python tools
-    - name: Install Python dependencies
+    - name: Install Python deps
       run: |
         pip install --upgrade pip
         pip install buildozer cython
 
-    # Accepter les licences Android automatiquement
-    - name: Accept Android licenses
+    - name: Accept licenses
       run: |
         mkdir -p ~/.android
         echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.android/repositories.cfg || true
 
-    # Initialiser buildozer si absent
-    - name: Create buildozer.spec if missing
-      run: |
-        if [ ! -f buildozer.spec ]; then
-          buildozer init
-        fi
-
-    # Corriger automatiquement buildozer.spec
-    - name: Configure buildozer
-      run: |
-        sed -i 's/title = .*/title = Mini Brawl Stars/' buildozer.spec
-        sed -i 's/package.name = .*/package.name = minibrawl/' buildozer.spec
-        sed -i 's/source.include_exts = .*/source.include_exts = py,png,jpg,wav,mp3,json,kv/' buildozer.spec
-        
-        echo "" >> buildozer.spec
-        echo "android.api = 33" >> buildozer.spec
-        echo "android.build_tools = 33.0.2" >> buildozer.spec
-        echo "android.accept_sdk_license = True" >> buildozer.spec
-
-    # Build APK
-    - name: Build with Buildozer
+    - name: Build APK
       run: |
         buildozer android debug
 
-    # Upload APK (VERSION V4 !!!)
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
