@@ -12,46 +12,36 @@ jobs:
     - name: 📥 Checkout repo
       uses: actions/checkout@v3
 
-    # Installer Python compatible Buildozer
     - name: 🐍 Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    # Installer dépendances Linux pour Buildozer
     - name: ⚙️ Install system packages
       run: |
         sudo apt update
         sudo apt install -y \
-          build-essential \
-          git \
-          zip \
-          unzip \
-          openjdk-17-jdk \
-          python3-pip \
-          autoconf \
-          libtool \
-          pkg-config \
-          zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
-          libtinfo5 \
-          cmake \
-          libffi-dev \
-          libssl-dev
+          build-essential git zip unzip openjdk-17-jdk \
+          python3-pip autoconf libtool pkg-config \
+          zlib1g-dev libncurses5-dev libncursesw5-dev \
+          cmake libffi-dev libssl-dev
 
-    # Installer Buildozer
     - name: 📦 Install Buildozer
       run: |
         python -m pip install --upgrade pip
         pip install buildozer cython
 
-    # 🔥 Build APK
-    - name: 📱 Build with Buildozer
+    # 🔥 NOUVELLE ÉTAPE IMPORTANTE
+    - name: 🤖 Accept Android licenses
+      run: |
+        mkdir -p ~/.android
+        touch ~/.android/repositories.cfg
+        yes | buildozer android sdkmanager --licenses || true
+
+    - name: 📱 Build APK
       run: |
         buildozer android debug
 
-    # 📤 Envoyer APK en téléchargement
     - name: 📤 Upload APK
       uses: actions/upload-artifact@v4
       with:
