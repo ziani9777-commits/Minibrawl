@@ -2,61 +2,90 @@ name: Build APK
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-24.04
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-    - name: Set up Java 17
+    # 🟢 Java 17 obligatoire pour buildozer
+    - name: Setup Java
       uses: actions/setup-java@v4
       with:
         distribution: temurin
         java-version: 17
 
-    - name: Install Linux deps
+    # 🟢 Installer dépendances Linux pour Kivy / Buildozer
+    - name: Install system dependencies
       run: |
+        sudo dpkg --add-architecture i386
         sudo apt-get update
+
         sudo apt-get install -y \
-          git zip unzip python3-pip autoconf libtool \
-          pkg-config zlib1g-dev libncurses-dev \
-          libncurses6 libtinfo6 cmake libffi-dev \
-          libssl-dev build-essential wget
+          python3-pip \
+          build-essential \
+          git \
+          zip \
+          unzip \
+          openjdk-17-jdk \
+          autoconf \
+          libtool \
+          pkg-config \
+          zlib1g-dev \
+          libncurses-dev \
+          libtinfo-dev \
+          cmake \
+          libffi-dev \
+          libssl-dev
 
-        sudo ln -s /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
-
-    - name: Install buildozer
+    # 🟢 Installer Buildozer + Cython
+    - name: Install Python dependencies
       run: |
-        pip install --upgrade pip
-        pip install buildozer cython
+        pip install --user buildozer cython
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-    # ⭐ NOUVELLE ÉTAPE IMPORTANTE
-    - name: Install Android cmdline-tools
+    # 💣 Installer Android SDK + FIX BUILDOZER (le hack magique)
+    - name: Install Android cmdline-tools + Fix sdkmanager
       run: |
-        mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools
-        cd ~/.buildozer/android/platform/android-sdk/cmdline-tools
+        ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
+        mkdir -p $ANDROID_HOME/cmdline-tools
+        cd $ANDROID_HOME/cmdline-tools
 
         wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
         unzip tools.zip
         mv cmdline-tools latest
 
-        echo "ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk" >> $GITHUB_ENV
-        echo "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        # 🔥 HACK pour Buildozer (très important)
+        mkdir -p $ANDROID_HOME/tools/bin
+        ln -s $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager $ANDROID_HOME/tools/bin/sdkmanager
+        ln -s $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager $ANDROID_HOME/tools/bin/avdmanager
 
-    - name: Accept licenses & install SDK
+        echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+        echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+
+    # 🟢 Accepter licences Android
+    - name: Accept Android licenses
+      run: yes | sdkmanager --licenses
+
+    # 🟢 Installer plateformes Android requises
+    - name: Install Android platforms
       run: |
-        yes | sdkmanager --licenses
-        sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+        sdkmanager "platform-tools"
+        sdkmanager "platforms;android-33"
+        sdkmanager "build-tools;33.0.2"
 
-    - name: Build APK
-      run: buildozer -v android debug
+    # 🟢 Build APK avec Buildozer
+    - name: Build with Buildozer
+      run: |
+        buildozer -v android debug
 
+    # 📦 Upload APK en artifact GitHub
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: APK
+        name: Minibrawl-APK
         path: bin/*.apk
