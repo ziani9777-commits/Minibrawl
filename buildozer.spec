@@ -9,7 +9,8 @@ source.include_exts = py,png,jpg,wav,mp3,json,kv
 
 version = 1.0
 
-requirements = python3,kivy
+requirements = 
+python3,kivy==2.3.0,pillow,ffpyplayer
 
 orientation = portrait
 fullscreen = 0
