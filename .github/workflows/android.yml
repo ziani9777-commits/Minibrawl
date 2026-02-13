@@ -12,19 +12,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Python correct (Buildozer ne supporte PAS 3.12)
+      # Python compatible Buildozer
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
+      # ⭐ FORCER JAVA 17 (FIX ERREUR CLASS VERSION 61)
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
       - name: Install system deps
         run: |
           sudo apt update
           sudo apt install -y \
-            build-essential \
-            git zip unzip openjdk-17-jdk \
-            autoconf libtool pkg-config \
+            build-essential git zip unzip autoconf libtool pkg-config \
             zlib1g-dev libncurses5-dev libncursesw5-dev \
             libtinfo5 cmake libffi-dev libssl-dev
 
@@ -33,7 +38,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install buildozer cython
 
-      # 📦 Installer Android Command Line Tools
       - name: Install Android SDK
         run: |
           mkdir -p $HOME/android-sdk/cmdline-tools
@@ -48,23 +52,19 @@ jobs:
           echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
 
-      # ✅ ACCEPTER LICENCES (ERREUR PRINCIPALE AVANT)
+      # ✅ maintenant sdkmanager fonctionne (Java 17 actif)
       - name: Accept SDK licenses
         run: yes | sdkmanager --licenses
 
-      # 📦 Installer packages Android nécessaires
       - name: Install SDK packages
         run: |
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-33"
           sdkmanager "build-tools;33.0.2"
 
-      # 🔨 Build APK
-      - name: Build with Buildozer
-        run: |
-          buildozer android debug
+      - name: Build APK
+        run: buildozer android debug
 
-      # 📤 Upload APK (version non deprecated)
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
