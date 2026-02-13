@@ -2,75 +2,69 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      # 🐍 Python
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.10
+    # 🐍 Python correct (ERREUR 3.1 FIX)
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+        cache: "pip"
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install buildozer cython kivy
+    # ☕ Java 17 (ERREUR Java FIX)
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
 
-      # ☕ Java 17 obligatoire pour sdkmanager
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
+    # 📦 Dépendances Linux pour Buildozer
+    - name: Install system dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          git zip unzip openjdk-17-jdk \
+          python3-pip autoconf libtool pkg-config \
+          zlib1g-dev libncurses5-dev libncursesw5-dev \
+          libtinfo5 cmake libffi-dev libssl-dev
 
-      # 📦 Installer Android SDK command line tools
-      - name: Install Android SDK
-        run: |
-          mkdir -p $ANDROID_HOME/cmdline-tools
-          cd $ANDROID_HOME/cmdline-tools
-          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
-          unzip tools.zip
-          mv cmdline-tools latest
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+    # 🔧 Installer Buildozer
+    - name: Install Buildozer
+      run: |
+        python -m pip install --upgrade pip
+        pip install buildozer cython
 
-      # 🔥 Accepter licences (méthode GitHub qui marche)
-      - name: Accept SDK licenses
-        run: |
-          mkdir -p $ANDROID_HOME/licenses
-          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $ANDROID_HOME/licenses/android-sdk-license
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $ANDROID_HOME/licenses/android-sdk-license
-          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> $ANDROID_HOME/licenses/android-sdk-license
+    # 🤖 Installer Android SDK + accepter licences (GROS BUG FIX)
+    - name: Install Android SDK
+      run: |
+        mkdir -p $HOME/android-sdk/cmdline-tools
+        cd $HOME/android-sdk/cmdline-tools
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O sdk.zip
+        unzip sdk.zip
+        mv cmdline-tools latest
+        echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+        echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+        echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        yes | sdkmanager --licenses
+        sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
-      # 📲 Installer EXACTEMENT ce que Buildozer veut
-      - name: Install SDK packages
-        run: |
-          sdkmanager --update
-          sdkmanager "platform-tools"
-          sdkmanager "platforms;android-34"
-          sdkmanager "build-tools;36.1.0"
+    # 📱 Build APK
+    - name: Build APK
+      run: |
+        buildozer android debug
 
-      # 🛠️ Build APK
-      - name: Build APK with Buildozer
-        run: |
-          buildozer init || true
-          buildozer android debug
-
-      # 📤 Upload APK (v4 obligatoire)
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: apk
-          path: bin/*.apk
+    # 📦 Upload APK (erreur v3 FIX)
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: minibrawl-apk
+        path: bin/*.apk
