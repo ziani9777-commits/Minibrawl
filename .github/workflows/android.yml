@@ -10,12 +10,15 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-    - uses: actions/setup-python@v5
+    - name: Setup Python
+      uses: actions/setup-python@v5
       with:
         python-version: "3.10"
 
+    # 🔥 INSTALLATION DES DEPENDANCES + JAVA 17 FORCÉ
     - name: Install system packages
       run: |
         sudo apt update
@@ -25,39 +28,45 @@ jobs:
           zlib1g-dev libncurses5-dev libncursesw5-dev \
           cmake libffi-dev libssl-dev
 
+        echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
+        echo "/usr/lib/jvm/java-17-openjdk-amd64/bin" >> $GITHUB_PATH
+
+    # 🔥 INSTALL BUILDOZER
     - name: Install Buildozer
       run: |
         pip install --upgrade pip
-        pip install buildozer cython==0.29.36
+        pip install buildozer cython
 
-    # ✅ INSTALL ANDROID SDK (FIXED)
+    # 🔥 INSTALL ANDROID SDK (PROPRE)
     - name: Install Android SDK
       run: |
-        mkdir -p $HOME/android-sdk
-        cd $HOME/android-sdk
+        mkdir -p $HOME/android-sdk/cmdline-tools
+        cd $HOME/android-sdk/cmdline-tools
 
-        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
+        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
         unzip tools.zip
+        rm tools.zip
 
-        # FIX : rename correct folder structure
-        mkdir -p cmdline-tools/latest
-        mv cmdline-tools/* cmdline-tools/latest/ || true
+        mv cmdline-tools latest
 
         echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
         echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
         echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
 
+    # 🔥 INSTALL SDK COMPONENTS + ACCEPT LICENSES
     - name: Install SDK packages
       run: |
         yes | sdkmanager --licenses
         sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
-    - name: Build APK
+    # 🔥 BUILD APK
+    - name: Build APK with Buildozer
       run: |
         buildozer android debug
 
+    # 🔥 UPLOAD APK (v4 obligatoire)
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: apk
+        name: APK
         path: bin/*.apk
