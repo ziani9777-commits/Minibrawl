@@ -1,63 +1,282 @@
-name: Build Android APK
+import random
+from collections import deque
 
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+from kivy.app import App
+from kivy.clock import Clock
+from kivy.core.window import Window
+from kivy.graphics import Color, Ellipse, Rectangle
+from kivy.uix.label import Label
+from kivy.uix.widget import Widget
+from kivy.vector import Vector
 
-jobs:
-  build:
-    runs-on: ubuntu-22.04
+Window.size = (360, 640)
 
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
 
-    # Python version correcte
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
+# =====================
+# JOYSTICK (canvas persistant)
+# =====================
+class Joystick(Widget):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.dx = 0.0
+        self.dy = 0.0
 
-    # Java 17 obligatoire pour sdkmanager moderne
-    - name: Set up Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: "temurin"
-        java-version: "17"
+        # Géométrie du joystick
+        self.base_center = Vector(90, 90)
+        self.base_radius = 60
+        self.knob_radius = 30
 
-    # 🔥 DEPENDANCES LINUX NECESSAIRES POUR COMPILER KIVY
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y \
-          git zip unzip openjdk-17-jdk \
-          python3-pip autoconf libtool pkg-config \
-          zlib1g-dev libncurses5-dev libncursesw5-dev \
-          cmake libffi-dev libssl-dev \
-          libltdl-dev \
-          libgl1-mesa-dev \
-          libgles2-mesa-dev \
-          libegl1-mesa-dev \
-          libsdl2-dev \
-          libsdl2-image-dev \
-          libsdl2-mixer-dev \
-          libsdl2-ttf-dev
+        with self.canvas:
+            Color(.3, .3, .3)
+            self.base = Ellipse(pos=(30, 30), size=(120, 120))
+            Color(.7, .7, .7)
+            self.knob = Ellipse(pos=(60, 60), size=(60, 60))
 
-    # Installer Buildozer + Cython
-    - name: Install Buildozer
-      run: |
-        python -m pip install --upgrade pip
-        pip install buildozer cython
+    def _set_knob_from_touch(self, touch):
+        # Vector du centre vers le touch
+        v = Vector(touch.x, touch.y) - self.base_center
+        # Clamp dans le cercle du joystick
+        if v.length() > self.base_radius:
+            v = v.normalize() * self.base_radius
 
-    # 🟢 Build APK
-    - name: Build APK
-      run: |
-        buildozer android debug
+        # Normalisation [-1..1]
+        self.dx = v.x / self.base_radius
+        self.dy = v.y / self.base_radius
 
-    # 📦 Upload APK en artifact téléchargeable
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: apk
-        path: bin/*.apk
+        knob_center = self.base_center + v
+        self.knob.pos = (knob_center.x - self.knob_radius, knob_center.y - self.knob_radius)
+
+    def on_touch_down(self, touch):
+        # Capture seulement zone gauche + proche du joystick
+        if touch.x <= 180 and (Vector(touch.x, touch.y) - self.base_center).length() <= self.base_radius * 1.6:
+            self._set_knob_from_touch(touch)
+            return True
+        return super().on_touch_down(touch)
+
+    def on_touch_move(self, touch):
+        if touch.x <= 180:
+            self._set_knob_from_touch(touch)
+            return True
+        return super().on_touch_move(touch)
+
+    def on_touch_up(self, touch):
+        # Reset
+        self.dx = 0.0
+        self.dy = 0.0
+        self.knob.pos = (60, 60)
+        return super().on_touch_up(touch)
+
+
+# =====================
+# BULLET (data + instruction graphique)
+# =====================
+class Bullet:
+    __slots__ = ("pos", "dir", "speed", "r", "instr")
+
+    def __init__(self):
+        self.pos = Vector(0, 0)
+        self.dir = Vector(0, 0)
+        self.speed = 7.0
+        self.r = 5.0
+        self.instr = None  # Ellipse instruction
+
+    def reset(self, x, y, direction):
+        self.pos.xy = (x, y)
+        self.dir = direction
+
+
+# =====================
+# PLAYER / BOT
+# =====================
+class Player:
+    def __init__(self):
+        self.pos = Vector(180, 320)
+        self.hp = 100
+        self.size = 40
+
+
+class Bot:
+    def __init__(self):
+        self.pos = Vector(random.randint(50, 300), random.randint(120, 520))
+        self.hp = 100
+        self.dir = Vector(1, 0)
+
+    def update(self):
+        self.pos += self.dir
+        if random.random() < .02:
+            self.dir = Vector(random.uniform(-1, 1), random.uniform(-1, 1))
+
+
+# =====================
+# GAME (canvas persistant + pooling bullets)
+# =====================
+class GameWidget(Widget):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.player = Player()
+        self.bot = Bot()
+
+        # Bullet pooling (évite allocations fréquentes)
+        self.bullets = []
+        self.bullet_pool = deque()  # bullets réutilisables
+
+        self.pass_xp = 0
+        self.pass_level = 1
+
+        # UI
+        self.joystick = Joystick()
+        self.add_widget(self.joystick)
+
+        self.hp_label = Label(text="HP:100", pos=(250, 600))
+        self.pass_label = Label(text="Pass Lv 1", pos=(10, 600))
+        self.add_widget(self.hp_label)
+        self.add_widget(self.pass_label)
+
+        # --- Canvas persistant (on crée une seule fois) ---
+        with self.canvas:
+            # Sol
+            Color(.6, .9, .6)
+            self.ground = Rectangle(pos=(0, 0), size=Window.size)
+
+            # Bush (statique)
+            Color(.2, .7, .2)
+            self.bush = Rectangle(pos=(120, 260), size=(100, 80))
+
+            # Joueur
+            Color(0, 0, 1)
+            self.player_instr = Ellipse(pos=(self.player.pos.x, self.player.pos.y), size=(40, 40))
+
+            # Bot
+            Color(1, 0, 0)
+            self.bot_instr = Ellipse(pos=(self.bot.pos.x, self.bot.pos.y), size=(40, 40))
+
+            # Couleur balles (les Ellipse seront ajoutées après)
+            Color(1, 1, 0)
+
+        Clock.schedule_interval(self.update, 1 / 60)
+
+    # ----- Bullets helpers -----
+    def _spawn_bullet(self, x, y, direction):
+        if self.bullet_pool:
+            b = self.bullet_pool.pop()
+        else:
+            b = Bullet()
+            # Crée l'instruction graphique une fois
+            b.instr = Ellipse(pos=(x, y), size=(10, 10))
+            self.canvas.add(b.instr)
+
+        b.reset(x, y, direction)
+        b.instr.pos = (x, y)
+        self.bullets.append(b)
+
+    def _despawn_bullet(self, b):
+        # On masque la balle (au lieu de remove instruction) pour réduire le churn GPU/canvas
+        b.instr.pos = (-1000, -1000)
+        self.bullets.remove(b)
+        self.bullet_pool.append(b)
+
+    # ===== TIR =====
+    def on_touch_down(self, touch):
+        # Le joystick gère déjà la zone gauche via son on_touch_down (retourne True si capturé)
+        if touch.x > 180:
+            direction = Vector(touch.x, touch.y) - self.player.pos
+            if direction.length() > 0:
+                direction = direction.normalize()
+                self._spawn_bullet(self.player.pos.x, self.player.pos.y, direction)
+            return True
+        return super().on_touch_down(touch)
+
+    # ===== UPDATE =====
+    def update(self, dt):
+        # Player move
+        if self.joystick.dx or self.joystick.dy:
+            self.player.pos += Vector(self.joystick.dx, self.joystick.dy) * 3
+
+            # Clamp à l'écran
+            max_x = Window.width - self.player.size
+            max_y = Window.height - self.player.size
+            self.player.pos.x = max(0, min(self.player.pos.x, max_x))
+            self.player.pos.y = max(0, min(self.player.pos.y, max_y))
+
+        # Bot move
+        self.bot.update()
+
+        # Update bullets + collisions
+        # Collision radius approx: bot/player 40px -> seuil ~30px (comme ton code)
+        hit_r2 = 30 * 30
+
+        for b in self.bullets[:]:
+            b.pos += b.dir * b.speed
+            b.instr.pos = (b.pos.x, b.pos.y)
+
+            # Despawn si hors écran (évite accumulation)
+            if b.pos.x < -20 or b.pos.x > Window.width + 20 or b.pos.y < -20 or b.pos.y > Window.height + 20:
+                self._despawn_bullet(b)
+                continue
+
+            # Collision bot (distance²)
+            if (b.pos - self.bot.pos).length_squared() < hit_r2:
+                self.bot.hp -= 10
+                self._despawn_bullet(b)
+
+                self.pass_xp += 5
+                if self.pass_xp > 50:
+                    self.pass_level += 1
+                    self.pass_xp = 0
+
+                if self.bot.hp <= 0:
+                    # Respawn bot + update instruction (sans clear canvas)
+                    self.bot = Bot()
+                    self.bot_instr.pos = (self.bot.pos.x, self.bot.pos.y)
+
+        # Update graphics (positions uniquement)
+        self.player_instr.pos = (self.player.pos.x, self.player.pos.y)
+        self.bot_instr.pos = (self.bot.pos.x, self.bot.pos.y)
+
+        # Labels
+        self.hp_label.text = f"HP:{self.player.hp}"
+        self.pass_label.text = f"Pass Lv {self.pass_level}"
+
+
+# =====================
+# MENU
+# =====================
+class MenuWidget(Widget):
+    def __init__(self, switch_callback, **kwargs):
+        super().__init__(**kwargs)
+        self.switch = switch_callback
+        self.label = Label(text="Mini Brawl", font_size=40, pos=(0, 200))
+        self.play = Label(text="TOUCHER POUR JOUER", pos=(0, 100))
+        self.add_widget(self.label)
+        self.add_widget(self.play)
+
+    def on_touch_down(self, touch):
+        self.switch()
+        return True
+
+
+# =====================
+# ROOT
+# =====================
+class Root(Widget):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.menu = MenuWidget(self.start_game)
+        self.add_widget(self.menu)
+
+    def start_game(self):
+        self.clear_widgets()
+        self.add_widget(GameWidget())
+
+
+# =====================
+# APP
+# =====================
+class MiniBrawlApp(App):
+    def build(self):
+        return Root()
+
+
+if __name__ == "__main__":
+    MiniBrawlApp().run()
