@@ -1,282 +1,107 @@
-import random
-from collections import deque
+if (screen === "menu") {
+    const rank = getRank(save.t);
+    const b = BRAWLERS[save.sel];
 
-from kivy.app import App
-from kivy.clock import Clock
-from kivy.core.window import Window
-from kivy.graphics import Color, Ellipse, Rectangle
-from kivy.uix.label import Label
-from kivy.uix.widget import Widget
-from kivy.vector import Vector
+    return (
+      <div style={{
+        width: "100vw", 
+        height: "100vh",
+        background: "radial-gradient(circle at 50% 50%, #2980b9 0%, #2c3e50 100%)", // Fond bleu dynamique
+        fontFamily: "'Arial Black', Arial, sans-serif",
+        color: "#fff", 
+        position: "relative", 
+        overflow: "hidden",
+        userSelect: "none" // Empêche la sélection de texte
+      }}>
+        
+        {/* Barre du Haut : Profil et Trophées */}
+        <div style={{ position: "absolute", top: 20, left: 20, display: "flex", gap: 15 }}>
+          {/* Icône de Rang */}
+          <div style={{
+            background: rank.c, border: "4px solid #000", borderRadius: 12, 
+            width: 60, height: 60, display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 30, boxShadow: "0 4px 0 #000"
+          }}>
+            🏆
+          </div>
+          {/* Infos Joueur */}
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <div style={{ fontSize: 24, fontWeight: 900, color: "#fff", textShadow: "2px 2px 0 #000", textTransform: "uppercase" }}>
+              {rank.name}
+            </div>
+            <div style={{ fontSize: 18, color: "#FFD700", textShadow: "2px 2px 0 #000", fontWeight: 900 }}>
+              {save.t} Trophées
+            </div>
+          </div>
+        </div>
 
-Window.size = (360, 640)
+        {/* Ressources (Fausses pièces et gemmes pour le style) */}
+        <div style={{ position: "absolute", top: 20, right: 20, display: "flex", gap: 10 }}>
+          <div style={{ background: "rgba(0,0,0,0.6)", border: "3px solid #000", borderRadius: 20, padding: "4px 16px", display: "flex", alignItems: "center", gap: 8, fontSize: 18, fontWeight: 900 }}>
+            <span>🪙</span> <span style={{ color: "#FFD700" }}>1250</span>
+          </div>
+          <div style={{ background: "rgba(0,0,0,0.6)", border: "3px solid #000", borderRadius: 20, padding: "4px 16px", display: "flex", alignItems: "center", gap: 8, fontSize: 18, fontWeight: 900 }}>
+            <span>💎</span> <span style={{ color: "#2ecc71" }}>30</span>
+          </div>
+        </div>
 
+        {/* Centre : Le Brawler Actif */}
+        <div style={{
+          position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+          display: "flex", flexDirection: "column", alignItems: "center", zIndex: 10
+        }}>
+          {/* Emoji géant en guise de Brawler 3D */}
+          <div style={{ 
+            fontSize: 160, 
+            filter: "drop-shadow(0px 15px 5px rgba(0,0,0,0.5))", 
+            marginBottom: -10 
+          }}>
+            {["🔥","💪","⚡","❄️","👻"][b.id]}
+          </div>
+          
+          {/* Nom du Brawler */}
+          <div style={{ 
+            fontSize: 50, fontWeight: 900, color: b.color, textTransform: "uppercase",
+            WebkitTextStroke: "2px #000", filter: "drop-shadow(0px 4px 0px #000)"
+          }}>
+            {b.name}
+          </div>
+          
+          <div style={{ background: "#e67e22", border: "3px solid #000", borderRadius: 20, padding: "4px 16px", fontSize: 16, fontWeight: 900, marginTop: 5, boxShadow: "0 4px 0 #000" }}>
+            POUVOIR 9
+          </div>
+        </div>
 
-# =====================
-# JOYSTICK (canvas persistant)
-# =====================
-class Joystick(Widget):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.dx = 0.0
-        self.dy = 0.0
+        {/* Menu Gauche : Sélection Brawlers */}
+        <div style={{ position: "absolute", bottom: 30, left: 20 }}>
+          <button style={{
+            background: "#3498db", border: "5px solid #000", borderRadius: 16, padding: "16px 24px",
+            color: "#fff", fontSize: 24, fontWeight: 900, cursor: "pointer",
+            boxShadow: "0 8px 0 #000", textTransform: "uppercase", letterSpacing: 1,
+            transition: "transform 0.1s"
+          }} 
+          onPointerDown={(e) => e.currentTarget.style.transform = "translateY(4px)"}
+          onPointerUp={(e) => e.currentTarget.style.transform = "translateY(0)"}
+          onClick={() => setScreen("brawlers")}>
+            👊 Brawlers
+          </button>
+        </div>
 
-        # Géométrie du joystick
-        self.base_center = Vector(90, 90)
-        self.base_radius = 60
-        self.knob_radius = 30
+        {/* Menu Droite : Bouton JOUER Géant */}
+        <div style={{ position: "absolute", bottom: 30, right: 30 }}>
+          <button style={{
+            background: "#f1c40f", border: "6px solid #000", borderRadius: 20, padding: "20px 60px",
+            color: "#000", fontSize: 48, fontWeight: 900, cursor: "pointer",
+            boxShadow: "0 10px 0 #d35400, 0 15px 20px rgba(0,0,0,0.5)", 
+            textTransform: "uppercase", transform: "skewX(-5deg)", letterSpacing: 2
+          }} 
+          onPointerDown={(e) => e.currentTarget.style.transform = "skewX(-5deg) translateY(6px)"}
+          onPointerUp={(e) => e.currentTarget.style.transform = "skewX(-5deg) translateY(0)"}
+          onClick={() => setScreen("diffsel")}>
+            JOUER
+          </button>
+        </div>
 
-        with self.canvas:
-            Color(.3, .3, .3)
-            self.base = Ellipse(pos=(30, 30), size=(120, 120))
-            Color(.7, .7, .7)
-            self.knob = Ellipse(pos=(60, 60), size=(60, 60))
-
-    def _set_knob_from_touch(self, touch):
-        # Vector du centre vers le touch
-        v = Vector(touch.x, touch.y) - self.base_center
-        # Clamp dans le cercle du joystick
-        if v.length() > self.base_radius:
-            v = v.normalize() * self.base_radius
-
-        # Normalisation [-1..1]
-        self.dx = v.x / self.base_radius
-        self.dy = v.y / self.base_radius
-
-        knob_center = self.base_center + v
-        self.knob.pos = (knob_center.x - self.knob_radius, knob_center.y - self.knob_radius)
-
-    def on_touch_down(self, touch):
-        # Capture seulement zone gauche + proche du joystick
-        if touch.x <= 180 and (Vector(touch.x, touch.y) - self.base_center).length() <= self.base_radius * 1.6:
-            self._set_knob_from_touch(touch)
-            return True
-        return super().on_touch_down(touch)
-
-    def on_touch_move(self, touch):
-        if touch.x <= 180:
-            self._set_knob_from_touch(touch)
-            return True
-        return super().on_touch_move(touch)
-
-    def on_touch_up(self, touch):
-        # Reset
-        self.dx = 0.0
-        self.dy = 0.0
-        self.knob.pos = (60, 60)
-        return super().on_touch_up(touch)
-
-
-# =====================
-# BULLET (data + instruction graphique)
-# =====================
-class Bullet:
-    __slots__ = ("pos", "dir", "speed", "r", "instr")
-
-    def __init__(self):
-        self.pos = Vector(0, 0)
-        self.dir = Vector(0, 0)
-        self.speed = 7.0
-        self.r = 5.0
-        self.instr = None  # Ellipse instruction
-
-    def reset(self, x, y, direction):
-        self.pos.xy = (x, y)
-        self.dir = direction
-
-
-# =====================
-# PLAYER / BOT
-# =====================
-class Player:
-    def __init__(self):
-        self.pos = Vector(180, 320)
-        self.hp = 100
-        self.size = 40
-
-
-class Bot:
-    def __init__(self):
-        self.pos = Vector(random.randint(50, 300), random.randint(120, 520))
-        self.hp = 100
-        self.dir = Vector(1, 0)
-
-    def update(self):
-        self.pos += self.dir
-        if random.random() < .02:
-            self.dir = Vector(random.uniform(-1, 1), random.uniform(-1, 1))
-
-
-# =====================
-# GAME (canvas persistant + pooling bullets)
-# =====================
-class GameWidget(Widget):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        self.player = Player()
-        self.bot = Bot()
-
-        # Bullet pooling (évite allocations fréquentes)
-        self.bullets = []
-        self.bullet_pool = deque()  # bullets réutilisables
-
-        self.pass_xp = 0
-        self.pass_level = 1
-
-        # UI
-        self.joystick = Joystick()
-        self.add_widget(self.joystick)
-
-        self.hp_label = Label(text="HP:100", pos=(250, 600))
-        self.pass_label = Label(text="Pass Lv 1", pos=(10, 600))
-        self.add_widget(self.hp_label)
-        self.add_widget(self.pass_label)
-
-        # --- Canvas persistant (on crée une seule fois) ---
-        with self.canvas:
-            # Sol
-            Color(.6, .9, .6)
-            self.ground = Rectangle(pos=(0, 0), size=Window.size)
-
-            # Bush (statique)
-            Color(.2, .7, .2)
-            self.bush = Rectangle(pos=(120, 260), size=(100, 80))
-
-            # Joueur
-            Color(0, 0, 1)
-            self.player_instr = Ellipse(pos=(self.player.pos.x, self.player.pos.y), size=(40, 40))
-
-            # Bot
-            Color(1, 0, 0)
-            self.bot_instr = Ellipse(pos=(self.bot.pos.x, self.bot.pos.y), size=(40, 40))
-
-            # Couleur balles (les Ellipse seront ajoutées après)
-            Color(1, 1, 0)
-
-        Clock.schedule_interval(self.update, 1 / 60)
-
-    # ----- Bullets helpers -----
-    def _spawn_bullet(self, x, y, direction):
-        if self.bullet_pool:
-            b = self.bullet_pool.pop()
-        else:
-            b = Bullet()
-            # Crée l'instruction graphique une fois
-            b.instr = Ellipse(pos=(x, y), size=(10, 10))
-            self.canvas.add(b.instr)
-
-        b.reset(x, y, direction)
-        b.instr.pos = (x, y)
-        self.bullets.append(b)
-
-    def _despawn_bullet(self, b):
-        # On masque la balle (au lieu de remove instruction) pour réduire le churn GPU/canvas
-        b.instr.pos = (-1000, -1000)
-        self.bullets.remove(b)
-        self.bullet_pool.append(b)
-
-    # ===== TIR =====
-    def on_touch_down(self, touch):
-        # Le joystick gère déjà la zone gauche via son on_touch_down (retourne True si capturé)
-        if touch.x > 180:
-            direction = Vector(touch.x, touch.y) - self.player.pos
-            if direction.length() > 0:
-                direction = direction.normalize()
-                self._spawn_bullet(self.player.pos.x, self.player.pos.y, direction)
-            return True
-        return super().on_touch_down(touch)
-
-    # ===== UPDATE =====
-    def update(self, dt):
-        # Player move
-        if self.joystick.dx or self.joystick.dy:
-            self.player.pos += Vector(self.joystick.dx, self.joystick.dy) * 3
-
-            # Clamp à l'écran
-            max_x = Window.width - self.player.size
-            max_y = Window.height - self.player.size
-            self.player.pos.x = max(0, min(self.player.pos.x, max_x))
-            self.player.pos.y = max(0, min(self.player.pos.y, max_y))
-
-        # Bot move
-        self.bot.update()
-
-        # Update bullets + collisions
-        # Collision radius approx: bot/player 40px -> seuil ~30px (comme ton code)
-        hit_r2 = 30 * 30
-
-        for b in self.bullets[:]:
-            b.pos += b.dir * b.speed
-            b.instr.pos = (b.pos.x, b.pos.y)
-
-            # Despawn si hors écran (évite accumulation)
-            if b.pos.x < -20 or b.pos.x > Window.width + 20 or b.pos.y < -20 or b.pos.y > Window.height + 20:
-                self._despawn_bullet(b)
-                continue
-
-            # Collision bot (distance²)
-            if (b.pos - self.bot.pos).length_squared() < hit_r2:
-                self.bot.hp -= 10
-                self._despawn_bullet(b)
-
-                self.pass_xp += 5
-                if self.pass_xp > 50:
-                    self.pass_level += 1
-                    self.pass_xp = 0
-
-                if self.bot.hp <= 0:
-                    # Respawn bot + update instruction (sans clear canvas)
-                    self.bot = Bot()
-                    self.bot_instr.pos = (self.bot.pos.x, self.bot.pos.y)
-
-        # Update graphics (positions uniquement)
-        self.player_instr.pos = (self.player.pos.x, self.player.pos.y)
-        self.bot_instr.pos = (self.bot.pos.x, self.bot.pos.y)
-
-        # Labels
-        self.hp_label.text = f"HP:{self.player.hp}"
-        self.pass_label.text = f"Pass Lv {self.pass_level}"
-
-
-# =====================
-# MENU
-# =====================
-class MenuWidget(Widget):
-    def __init__(self, switch_callback, **kwargs):
-        super().__init__(**kwargs)
-        self.switch = switch_callback
-        self.label = Label(text="Mini Brawl", font_size=40, pos=(0, 200))
-        self.play = Label(text="TOUCHER POUR JOUER", pos=(0, 100))
-        self.add_widget(self.label)
-        self.add_widget(self.play)
-
-    def on_touch_down(self, touch):
-        self.switch()
-        return True
-
-
-# =====================
-# ROOT
-# =====================
-class Root(Widget):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.menu = MenuWidget(self.start_game)
-        self.add_widget(self.menu)
-
-    def start_game(self):
-        self.clear_widgets()
-        self.add_widget(GameWidget())
-
-
-# =====================
-# APP
-# =====================
-class MiniBrawlApp(App):
-    def build(self):
-        return Root()
-
-
-if __name__ == "__main__":
-    MiniBrawlApp().run()
+      </div>
+    );
+  }
