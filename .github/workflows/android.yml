@@ -1,107 +1,101 @@
-if (screen === "menu") {
+import React, { useState, useEffect, useRef } from "react";
+
+// --- Constantes et Données ---
+const GW = 1280, GH = 720;
+const UNIT_R = 28;
+
+const BRAWLERS = [
+  { id: 0, name: "Shelly", color: "#e74c3c", dark: "#922b21", skin: "#FDBCB4", hair: "#8B4513", hp: 5000, spd: 3.6, range: 155, dmg: 460, cd: 750, unlock: 0 },
+  { id: 1, name: "Bull", color: "#e67e22", dark: "#784212", skin: "#D4A574", hair: "#2C1503", hp: 9000, spd: 2.5, range: 88, dmg: 880, cd: 950, unlock: 50 },
+  { id: 2, name: "Bea", color: "#f1c40f", dark: "#9A7D0A", skin: "#FDBCB4", hair: "#F4D03F", hp: 3800, spd: 4.1, range: 200, dmg: 370, cd: 550, unlock: 120 },
+  { id: 3, name: "Spike", color: "#27ae60", dark: "#1D8348", skin: "#A9DFBF", hair: "#1E8449", hp: 3600, spd: 3.7, range: 180, dmg: 390, cd: 600, unlock: 250 },
+  { id: 4, name: "Leon", color: "#8e44ad", dark: "#6C3483", skin: "#FDBCB4", hair: "#7D3C98", hp: 4500, spd: 5.0, range: 148, dmg: 350, cd: 500, unlock: 500 },
+];
+
+const RANKS = [
+  { name: "Bronze I", min: 0, c: "#cd7f32" }, { name: "Bronze II", min: 30, c: "#cd7f32" }, { name: "Bronze III", min: 60, c: "#cd7f32" },
+  { name: "Argent I", min: 100, c: "#bbb" }, { name: "Argent II", min: 150, c: "#bbb" }, { name: "Argent III", min: 200, c: "#bbb" },
+  { name: "Or I", min: 300, c: "#FFD700" }, { name: "Or II", min: 400, c: "#FFD700" }, { name: "Or III", min: 500, c: "#FFD700" },
+  { name: "Diamant", min: 700, c: "#00e5ff" }, { name: "Légende", min: 1000, c: "#ff4081" },
+];
+
+const DIFFS = [
+  { id: "easy", label: "Facile", c: "#2ecc71", bspd: 0.55, bacc: 0.4, mult: 0.7 },
+  { id: "normal", label: "Normal", c: "#f39c12", bspd: 0.82, bacc: 0.70, mult: 1.0 },
+  { id: "hard", label: "Difficile", c: "#e74c3c", bspd: 1.12, bacc: 0.96, mult: 1.5 },
+];
+
+// --- Fonctions Utilitaires ---
+const getRank = t => { let r = RANKS[0]; for (const rk of RANKS) if (t >= rk.min) r = rk; return r; };
+const loadSave = () => { try { const s = JSON.parse(localStorage.getItem("bsv4") || "{}"); return { t: s.t || 0, ul: s.ul || [0], sel: s.sel || 0 }; } catch { return { t: 0, ul: [0], sel: 0 }; } };
+const doSave = d => { try { localStorage.setItem("bsv4", JSON.stringify(d)); } catch { } };
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const norm = v => { const m = Math.hypot(v.x, v.y) || 1; return { x: v.x / m, y: v.y / m }; };
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+// --- Dessin (Canvas) ---
+function drawChar(ctx, x, y, br, team, facingLeft = false, sc = 1, flashing = false) {
+  ctx.save();
+  ctx.translate(x, y);
+  if (facingLeft) ctx.scale(-sc, sc); else ctx.scale(sc, sc);
+  const C = br.color, Dk = br.dark, Sk = br.skin, Hr = br.hair;
+  const fl = flashing;
+
+  ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.ellipse(0, 42, 26, 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = team === 0 ? "#00d2ff" : "#ff4444"; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(0, 42, 22, 7, 0, 0, Math.PI * 2); ctx.stroke();
+
+  // Corps & Tête (Simplifié pour le code complet)
+  ctx.fillStyle = fl ? "#fff" : C; ctx.beginPath(); ctx.roundRect(-18, -8, 36, 34, 10); ctx.fill();
+  ctx.fillStyle = fl ? "#fff" : Sk; ctx.beginPath(); ctx.arc(0, -28, 24, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+const mkUnit = (x, y, br, team, id) => ({
+  x, y, hp: br.hp, maxHp: br.hp, spd: br.spd, dmg: br.dmg,
+  range: br.range, cd: br.cd, color: br.color, dark: br.dark, name: br.name, id: br.id, uid: id, team, alive: true, atkTimer: 0, flash: 0, facingLeft: team === 1
+});
+
+// --- Composant Principal ---
+export default function App() {
+  const [save, setSave] = useState(loadSave);
+  const [screen, setScreen] = useState("menu");
+  const canvasRef = useRef(null);
+  const stateRef = useRef(null);
+
+  const updateSave = patch => { setSave(prev => { const n = { ...prev, ...patch }; doSave(n); return n; }); };
+
+  // Logique de rendu des écrans
+  if (screen === "menu") {
     const rank = getRank(save.t);
     const b = BRAWLERS[save.sel];
-
     return (
       <div style={{
-        width: "100vw", 
-        height: "100vh",
-        background: "radial-gradient(circle at 50% 50%, #2980b9 0%, #2c3e50 100%)", // Fond bleu dynamique
-        fontFamily: "'Arial Black', Arial, sans-serif",
-        color: "#fff", 
-        position: "relative", 
-        overflow: "hidden",
-        userSelect: "none" // Empêche la sélection de texte
+        width: "100vw", height: "100vh",
+        background: "radial-gradient(circle at 50% 50%, #2980b9 0%, #2c3e50 100%)",
+        fontFamily: "'Arial Black', Arial, sans-serif", color: "#fff", position: "relative", overflow: "hidden"
       }}>
-        
-        {/* Barre du Haut : Profil et Trophées */}
+        {/* Profil */}
         <div style={{ position: "absolute", top: 20, left: 20, display: "flex", gap: 15 }}>
-          {/* Icône de Rang */}
-          <div style={{
-            background: rank.c, border: "4px solid #000", borderRadius: 12, 
-            width: 60, height: 60, display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 30, boxShadow: "0 4px 0 #000"
-          }}>
-            🏆
-          </div>
-          {/* Infos Joueur */}
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            <div style={{ fontSize: 24, fontWeight: 900, color: "#fff", textShadow: "2px 2px 0 #000", textTransform: "uppercase" }}>
-              {rank.name}
-            </div>
-            <div style={{ fontSize: 18, color: "#FFD700", textShadow: "2px 2px 0 #000", fontWeight: 900 }}>
-              {save.t} Trophées
-            </div>
+          <div style={{ background: rank.c, border: "4px solid #000", borderRadius: 12, width: 60, height: 60, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, boxShadow: "0 4px 0 #000" }}>🏆</div>
+          <div>
+            <div style={{ fontSize: 24, textShadow: "2px 2px 0 #000" }}>{rank.name}</div>
+            <div style={{ fontSize: 18, color: "#FFD700", textShadow: "2px 2px 0 #000" }}>{save.t} Trophées</div>
           </div>
         </div>
 
-        {/* Ressources (Fausses pièces et gemmes pour le style) */}
-        <div style={{ position: "absolute", top: 20, right: 20, display: "flex", gap: 10 }}>
-          <div style={{ background: "rgba(0,0,0,0.6)", border: "3px solid #000", borderRadius: 20, padding: "4px 16px", display: "flex", alignItems: "center", gap: 8, fontSize: 18, fontWeight: 900 }}>
-            <span>🪙</span> <span style={{ color: "#FFD700" }}>1250</span>
-          </div>
-          <div style={{ background: "rgba(0,0,0,0.6)", border: "3px solid #000", borderRadius: 20, padding: "4px 16px", display: "flex", alignItems: "center", gap: 8, fontSize: 18, fontWeight: 900 }}>
-            <span>💎</span> <span style={{ color: "#2ecc71" }}>30</span>
-          </div>
+        {/* Brawler */}
+        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" }}>
+          <div style={{ fontSize: 160, filter: "drop-shadow(0px 15px 5px rgba(0,0,0,0.5))" }}>{["🔥", "💪", "⚡", "❄️", "👻"][b.id]}</div>
+          <div style={{ fontSize: 50, color: b.color, WebkitTextStroke: "2px #000", fontWeight: 900 }}>{b.name}</div>
         </div>
 
-        {/* Centre : Le Brawler Actif */}
-        <div style={{
-          position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-          display: "flex", flexDirection: "column", alignItems: "center", zIndex: 10
-        }}>
-          {/* Emoji géant en guise de Brawler 3D */}
-          <div style={{ 
-            fontSize: 160, 
-            filter: "drop-shadow(0px 15px 5px rgba(0,0,0,0.5))", 
-            marginBottom: -10 
-          }}>
-            {["🔥","💪","⚡","❄️","👻"][b.id]}
-          </div>
-          
-          {/* Nom du Brawler */}
-          <div style={{ 
-            fontSize: 50, fontWeight: 900, color: b.color, textTransform: "uppercase",
-            WebkitTextStroke: "2px #000", filter: "drop-shadow(0px 4px 0px #000)"
-          }}>
-            {b.name}
-          </div>
-          
-          <div style={{ background: "#e67e22", border: "3px solid #000", borderRadius: 20, padding: "4px 16px", fontSize: 16, fontWeight: 900, marginTop: 5, boxShadow: "0 4px 0 #000" }}>
-            POUVOIR 9
-          </div>
-        </div>
-
-        {/* Menu Gauche : Sélection Brawlers */}
-        <div style={{ position: "absolute", bottom: 30, left: 20 }}>
-          <button style={{
-            background: "#3498db", border: "5px solid #000", borderRadius: 16, padding: "16px 24px",
-            color: "#fff", fontSize: 24, fontWeight: 900, cursor: "pointer",
-            boxShadow: "0 8px 0 #000", textTransform: "uppercase", letterSpacing: 1,
-            transition: "transform 0.1s"
-          }} 
-          onPointerDown={(e) => e.currentTarget.style.transform = "translateY(4px)"}
-          onPointerUp={(e) => e.currentTarget.style.transform = "translateY(0)"}
-          onClick={() => setScreen("brawlers")}>
-            👊 Brawlers
-          </button>
-        </div>
-
-        {/* Menu Droite : Bouton JOUER Géant */}
-        <div style={{ position: "absolute", bottom: 30, right: 30 }}>
-          <button style={{
-            background: "#f1c40f", border: "6px solid #000", borderRadius: 20, padding: "20px 60px",
-            color: "#000", fontSize: 48, fontWeight: 900, cursor: "pointer",
-            boxShadow: "0 10px 0 #d35400, 0 15px 20px rgba(0,0,0,0.5)", 
-            textTransform: "uppercase", transform: "skewX(-5deg)", letterSpacing: 2
-          }} 
-          onPointerDown={(e) => e.currentTarget.style.transform = "skewX(-5deg) translateY(6px)"}
-          onPointerUp={(e) => e.currentTarget.style.transform = "skewX(-5deg) translateY(0)"}
-          onClick={() => setScreen("diffsel")}>
-            JOUER
-          </button>
-        </div>
-
+        {/* Boutons */}
+        <button style={{ position: "absolute", bottom: 30, left: 20, background: "#3498db", border: "5px solid #000", borderRadius: 16, padding: "16px 24px", color: "#fff", fontSize: 24, fontWeight: 900, boxShadow: "0 8px 0 #000" }} onClick={() => setScreen("brawlers")}>👊 BRAWLERS</button>
+        <button style={{ position: "absolute", bottom: 30, right: 30, background: "#f1c40f", border: "6px solid #000", borderRadius: 20, padding: "20px 60px", color: "#000", fontSize: 48, fontWeight: 900, boxShadow: "0 10px 0 #d35400", transform: "skewX(-5deg)" }} onClick={() => setScreen("diffsel")}>JOUER</button>
       </div>
     );
   }
+
+  // Fallback (pour le chargement)
+  return <div style={{ background: "#000", height: "100vh" }}>Chargement...</div>;
+}
